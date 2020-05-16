@@ -2,9 +2,11 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import os.path
+import sys
 
 hostName = "localhost"
 serverPort = 17293
+storage = None
 
 def get_etag(path):
     """Return etag for a path"""
@@ -28,7 +30,7 @@ class MyServer(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/plain")
             self.end_headers()
             return
-        content, etag = slurp("current.html")
+        content, etag = slurp(storage)
         if not content:
             content, etag = slurp("empty.html")
         self.send_response(200)
@@ -39,7 +41,7 @@ class MyServer(BaseHTTPRequestHandler):
         self.wfile.write(content)
     def do_HEAD(self):
         # TiddlyWiki uses ETag to check if a save was successful?
-        etag = get_etag("current.html")
+        etag = get_etag(storage)
         self.send_response(200)
         self.send_header("Content-type", "text/html;charset=UTF-8")
         self.send_header("ETag", etag)
@@ -53,7 +55,7 @@ class MyServer(BaseHTTPRequestHandler):
         self.end_headers()
     def do_PUT(self):
         ifMatch = self.headers['If-Match']
-        etag = get_etag("current.html")
+        etag = get_etag(storage)
         if ifMatch != etag:
             self.send_response(412) # Conflict
             self.send_header("ETag", etag)
@@ -62,15 +64,20 @@ class MyServer(BaseHTTPRequestHandler):
             return
         length = int(self.headers['Content-Length'])
         content = self.rfile.read(length)
-        with open('current.html', 'w+b') as fh:
+        with open(storage, 'w+b') as fh:
             fh.write(content)
-        etag = get_etag("current.html")
+        etag = get_etag(storage)
         self.send_response(204)
         self.send_header("ETag", etag)
         self.send_header("Content-Length", "0")
         self.end_headers()
 
 if __name__ == "__main__":        
+    if len(sys.argv) > 1:
+        storage_folder = sys.argv[1]
+        storage = os.path.join(storage_folder, "tiddlywiki.html")
+    else:
+        storage = "current.html"
     webServer = HTTPServer((hostName, serverPort), MyServer)
     print("Server started http://%s:%s" % (hostName, serverPort))
 
