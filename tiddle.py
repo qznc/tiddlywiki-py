@@ -3,6 +3,7 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import os.path
 import sys
+import datetime
 
 hostName = "localhost"
 serverPort = 17293
@@ -18,10 +19,17 @@ def get_etag(path):
 def slurp(path):
     """Read all contents of a file as bytes"""
     if not os.path.isfile(path):
-        return None
+        return None, None
     etag = get_etag(path)
     with open(path, 'rb') as fh:
         return fh.read(), etag
+
+def backup_path(storage):
+    path, ext = os.path.splitext(storage)
+    first_of_current_month = datetime.datetime.utcnow().replace(day=1)
+    lastMonth = first_of_current_month - datetime.timedelta(days=1)
+    date = lastMonth.strftime("%Y-%m")
+    return f"{path}-{date}{ext}"
 
 class MyServer(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -66,6 +74,11 @@ class MyServer(BaseHTTPRequestHandler):
         content = self.rfile.read(length)
         with open(storage, 'w+b') as fh:
             fh.write(content)
+        backup = backup_path(storage)
+        if not os.path.isfile(backup):
+            with open(backup, 'w+b') as fh:
+                fh.write(content)
+            print("Stored backup:", backup)
         etag = get_etag(storage)
         self.send_response(204)
         self.send_header("ETag", etag)
