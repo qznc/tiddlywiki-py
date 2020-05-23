@@ -34,26 +34,15 @@ def backup_path(storage):
 class MyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path != "/":
-            self.send_response(404)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            return
+            return self.respond(404)
         content, etag = slurp(storage)
         if not content:
             content, etag = slurp("empty.html")
-        self.send_response(200)
-        self.send_header("Content-type", "text/html;charset=UTF-8")
-        self.send_header("Content-Length", len(content))
-        self.send_header("ETag", etag)
-        self.end_headers()
-        self.wfile.write(content)
+        self.respond(200, etag, content)
     def do_HEAD(self):
-        # TiddlyWiki uses ETag to check if a save was successful?
+        # TiddlyWiki uses ETag to check if a save was successful
         etag = get_etag(storage)
-        self.send_response(200)
-        self.send_header("Content-type", "text/html;charset=UTF-8")
-        self.send_header("ETag", etag)
-        self.end_headers()
+        self.respond(200, etag)
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('allow', "GET,HEAD,POST,OPTIONS,CONNECT,PUT,DAV,dav")
@@ -65,11 +54,7 @@ class MyServer(BaseHTTPRequestHandler):
         ifMatch = self.headers['If-Match']
         etag = get_etag(storage)
         if ifMatch != etag:
-            self.send_response(412) # Conflict
-            self.send_header("ETag", etag)
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return
+            return self.respond(412, etag)
         length = int(self.headers['Content-Length'])
         content = self.rfile.read(length)
         with open(storage, 'w+b') as fh:
@@ -80,10 +65,17 @@ class MyServer(BaseHTTPRequestHandler):
                 fh.write(content)
             print("Stored backup:", backup)
         etag = get_etag(storage)
-        self.send_response(204)
-        self.send_header("ETag", etag)
-        self.send_header("Content-Length", "0")
+        self.respond(204, etag)
+    def respond(self, status, etag=None, content=None):
+        self.send_response(status)
+        self.send_header("Content-type", "text/html;charset=UTF-8")
+        if etag:
+            self.send_header("ETag", etag)
+        if content:
+            self.send_header("Content-Length", len(content))
         self.end_headers()
+        if content:
+            self.wfile.write(content)
 
 if __name__ == "__main__":        
     if len(sys.argv) > 1:
