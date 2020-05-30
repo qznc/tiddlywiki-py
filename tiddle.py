@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import logging
+logging.basicConfig(level=logging.INFO)
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import os.path
@@ -14,7 +16,7 @@ def get_etag(path):
     if not os.path.isfile(path):
         return b""
     stat = os.stat(path)
-    return "%.1f" % stat.st_mtime
+    return "mtime_microseconds:%.0f" % (stat.st_mtime / 1000)
 
 def slurp(path):
     """Read all contents of a file as bytes"""
@@ -51,19 +53,23 @@ class MyServer(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
     def do_PUT(self):
+        length = int(self.headers['Content-Length'])
+        content = self.rfile.read(length)
         ifMatch = self.headers['If-Match']
         etag = get_etag(storage)
         if ifMatch != etag:
+            logging.warning(f"etag mismatch: {ifMatch} != {etag}")
+            with open("etag_mismatch.html", 'w+b') as fh:
+                fh.write(content)
             return self.respond(412, etag)
-        length = int(self.headers['Content-Length'])
-        content = self.rfile.read(length)
         with open(storage, 'w+b') as fh:
             fh.write(content)
+        logging.info(f"Stored: {storage}")
         backup = backup_path(storage)
         if not os.path.isfile(backup):
             with open(backup, 'w+b') as fh:
                 fh.write(content)
-            print("Stored backup:", backup)
+            logging.info(f"Stored backup: {backup}")
         etag = get_etag(storage)
         self.respond(204, etag)
     def respond(self, status, etag=None, content=None):
