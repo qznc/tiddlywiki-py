@@ -3,6 +3,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from hashlib import sha256
 import os.path
 import sys
 import datetime
@@ -11,20 +12,23 @@ hostName = "localhost"
 serverPort = 17293
 storage = None
 
+checksum = lambda x: sha256(x).hexdigest()
+
 def get_etag(path):
     """Return etag for a path"""
     if not os.path.isfile(path):
         return b""
-    stat = os.stat(path)
-    return "mtime_microseconds:%.0f" % (stat.st_mtime / 1000)
+    with open(path, 'rb') as fh:
+        h = checksum(fh.read())
+    return h
 
 def slurp(path):
     """Read all contents of a file as bytes"""
     if not os.path.isfile(path):
         return None, None
-    etag = get_etag(path)
     with open(path, 'rb') as fh:
-        return fh.read(), etag
+        c = fh.read()
+        return c, checksum(c)
 
 def backup_path(storage):
     path, ext = os.path.splitext(storage)
@@ -70,7 +74,7 @@ class MyServer(BaseHTTPRequestHandler):
             with open(backup, 'w+b') as fh:
                 fh.write(content)
             logging.info(f"Stored backup: {backup}")
-        etag = get_etag(storage)
+        etag = checksum(content)
         self.respond(204, etag)
     def respond(self, status, etag=None, content=None):
         self.send_response(status)
