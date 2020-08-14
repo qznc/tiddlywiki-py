@@ -63,12 +63,10 @@ class MyServer(BaseHTTPRequestHandler):
         etag = get_etag(storage)
         if ifMatch != etag:
             logging.warning(f"etag mismatch: {ifMatch} != {etag}")
-            with open("etag_mismatch.html", 'w+b') as fh:
-                fh.write(content)
-            return self.respond(412, etag)
         with open(storage, 'w+b') as fh:
             fh.write(content)
         logging.info(f"Stored: {storage}")
+        # Also store backup if it not exists yet
         backup = backup_path(storage)
         if not os.path.isfile(backup):
             with open(backup, 'w+b') as fh:
