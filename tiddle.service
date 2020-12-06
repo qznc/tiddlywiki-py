@@ -1,0 +1,11 @@
+[Unit]
+Description=TiddlyWiki server
+ConditionUser=copacetic
+
+[Service]
+WorkingDirectory=/home/copacetic/git/tiddlywiki-py
+ExecStart=python3 tiddle.py ~/Sync/
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

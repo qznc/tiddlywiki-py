@@ -88,9 +88,11 @@ class MyServer(BaseHTTPRequestHandler):
 if __name__ == "__main__":        
     if len(sys.argv) > 1:
         storage_folder = sys.argv[1]
-        storage = os.path.join(storage_folder, "tiddlywiki.html")
+        storage = os.path.expanduser(os.path.join(storage_folder,
+            "tiddlywiki.html"))
     else:
         storage = "current.html"
+    logging.info("Storage: %s" % (storage,))
     webServer = HTTPServer((hostName, serverPort), MyServer)
     print("Server started http://%s:%s" % (hostName, serverPort))
 
